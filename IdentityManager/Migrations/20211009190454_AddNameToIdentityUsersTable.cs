@@ -2,7 +2,7 @@
 
 namespace IdentityManager.Migrations
 {
-    public partial class AddNameToIdentityUserTable : Migration
+    public partial class AddNameToIdentityUsersTable : Migration
     {
         protected override void Up(MigrationBuilder migrationBuilder)
         {
