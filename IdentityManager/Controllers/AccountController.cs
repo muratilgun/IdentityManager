@@ -25,16 +25,19 @@ namespace IdentityManager.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> Register()
+        public async Task<IActionResult> Register(string returnUrl = null)
         {
+            ViewData["ReturnUrl"] = returnUrl;
             RegisterViewModel registerViewModel = new RegisterViewModel();
             return View(registerViewModel);
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Register(RegisterViewModel model)
+        public async Task<IActionResult> Register(RegisterViewModel model, string returnUrl = null)
         {
+            ViewData["ReturnUrl"] = returnUrl;
+            returnUrl = returnUrl ?? Url.Content("~/");
             if (ModelState.IsValid)
             {
                 var user = new IdentityManager.Models.ApplicationUser {UserName = model.Email,Email = model.Email,Name = model.Name};
@@ -43,7 +46,7 @@ namespace IdentityManager.Controllers
                 if (result.Succeeded)
                 {
                     await _signInManager.SignInAsync(user, isPersistent: false);
-                    return RedirectToAction("Index", "Home");
+                    return LocalRedirect(returnUrl);
                 }
                 AddErrors(result);
             }
@@ -51,27 +54,31 @@ namespace IdentityManager.Controllers
             return View(model);
         }
 
-        public IActionResult Login()
+        public IActionResult Login(string returnUrl = null)
         {
+            ViewData["ReturnUrl"] = returnUrl;
             return View();
         }
 
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Login(LoginViewModel model)
+        public async Task<IActionResult> Login(LoginViewModel model, string returnUrl = null)
         {
-            //if (ModelState.IsValid)
-            //{
-            //    var user = new IdentityManager.Models.ApplicationUser { UserName = model.Email, Email = model.Email, Name = model.Name };
-
-            //    var result = await _userManager.CreateAsync(user, model.Password);
-            //    if (result.Succeeded)
-            //    {
-            //        await _signInManager.SignInAsync(user, isPersistent: false);
-            //        return RedirectToAction("Index", "Home");
-            //    }
-            //    AddErrors(result);
-            //}
+            ViewData["ReturnUrl"] = returnUrl;
+            returnUrl = returnUrl ?? Url.Content("~/");
+            if (ModelState.IsValid)
+            {
+                var result = await _signInManager.PasswordSignInAsync(model.Email, model.Password,model.RememberMe,lockoutOnFailure:false);
+                if (result.Succeeded)
+                {
+                    return LocalRedirect(returnUrl);
+                }
+                else
+                {
+                    ModelState.AddModelError(string.Empty, "Invalid login attempt.");
+                    return View(model);
+                }
+            }
 
             return View(model);
         }
