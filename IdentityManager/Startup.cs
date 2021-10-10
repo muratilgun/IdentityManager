@@ -1,8 +1,10 @@
 using IdentityManager.Data;
+using IdentityManager.Services;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.HttpsPolicy;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -27,7 +29,16 @@ namespace IdentityManager
         public void ConfigureServices(IServiceCollection services)
         {
             services.AddDbContext<IdentityManager.Data.ApplicationDbContext>(options => options.UseSqlServer(Configuration.GetConnectionString("DefaultConnection")));
-            services.AddIdentity<IdentityUser, IdentityRole>().AddEntityFrameworkStores<IdentityManager.Data.ApplicationDbContext>();
+            services.AddIdentity<IdentityUser, IdentityRole>().AddEntityFrameworkStores<ApplicationDbContext>().AddDefaultTokenProviders();
+            services.AddTransient<IEmailSender, MailJetEmailSender>();
+
+            services.Configure<IdentityOptions>(opt =>
+            {
+                opt.Password.RequiredLength = 5;
+                opt.Password.RequireLowercase = true;
+                opt.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromSeconds(30);
+                opt.Lockout.MaxFailedAccessAttempts = 5;
+            });
             services.AddControllersWithViews();
         }
 
