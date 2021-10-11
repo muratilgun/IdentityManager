@@ -1,5 +1,7 @@
+using IdentityManager.Authorize;
 using IdentityManager.Data;
 using IdentityManager.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.HttpsPolicy;
@@ -9,6 +11,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -29,7 +32,7 @@ namespace IdentityManager
         public void ConfigureServices(IServiceCollection services)
         {
             services.AddDbContext<IdentityManager.Data.ApplicationDbContext>(options => options.UseSqlServer(Configuration.GetConnectionString("DefaultConnection")));
-            services.AddIdentity<IdentityUser, IdentityRole>().AddEntityFrameworkStores<ApplicationDbContext>().AddDefaultTokenProviders();
+            services.AddIdentity<IdentityUser, IdentityRole>().AddEntityFrameworkStores<ApplicationDbContext>().AddDefaultTokenProviders().AddDefaultUI();
             services.AddTransient<IEmailSender, MailJetEmailSender>();
 
             services.Configure<IdentityOptions>(opt =>
@@ -39,15 +42,31 @@ namespace IdentityManager
                 opt.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromSeconds(30);
                 opt.Lockout.MaxFailedAccessAttempts = 5;
             });
-            services.ConfigureApplicationCookie(opt => {
-                opt.AccessDeniedPath = new Microsoft.AspNetCore.Http.PathString("/Home/Accessdenied");
-                
-            });
-            services.AddAuthentication().AddFacebook(options => {
+            //services.ConfigureApplicationCookie(opt => {
+            //    opt.AccessDeniedPath = new Microsoft.AspNetCore.Http.PathString("/Home/Accessdenied");
+
+            //});
+            services.AddAuthentication().AddFacebook(options =>
+            {
                 options.AppId = "1062466197845879";
                 options.AppSecret = "275ff319687aef21282d2800f2a7ecfd";
-                
+
             });
+
+            services.AddAuthorization(options =>
+            {
+                options.AddPolicy("Admin", policy => policy.RequireRole("Admin"));
+                options.AddPolicy("UserAndAdmin", policy => policy.RequireRole("Admin").RequireRole("User"));
+                options.AddPolicy("Admin_CreateAccess", policy => policy.RequireRole("Admin").RequireClaim("Create", "True"));
+                options.AddPolicy("Admin_Create_Edit_DeleteAccess", policy => policy.RequireRole("Admin").RequireClaim("Create", "True").RequireClaim("Edit", "True").RequireClaim("Delete", "True"));
+                options.AddPolicy("Admin_Create_Edit_DeleteAccess_SuperAdmin", policy => policy.RequireAssertion(context => AuthorizeAdminWithClaimsOrSuperAdmin(context)));
+                options.AddPolicy("OnlySuperAdminChecker", policy => policy.Requirements.Add(new OnlySuperAdminChecker()));
+                options.AddPolicy("AdminWithMoreThan1000Days", policy=> policy.Requirements.Add(new AdminWithMoreThan1000DaysRequirement(1000)));
+                options.AddPolicy("FirstNameAuth", policy => policy.Requirements.Add(new FirstNameAuthRequirement("billy")));
+            });
+            services.AddScoped<IAuthorizationHandler, AdminWithOver1000DaysHandler>();
+            services.AddScoped<IAuthorizationHandler, FirstNameAuthHandler>();
+            services.AddScoped<INumberOfDaysForAccount, NumberOfDaysForAccount>();
             services.AddControllersWithViews();
             services.AddRazorPages();
         }
@@ -79,6 +98,15 @@ namespace IdentityManager
                     pattern: "{controller=Home}/{action=Index}/{id?}");
                 endpoints.MapRazorPages();
             });
+        }
+
+        private bool AuthorizeAdminWithClaimsOrSuperAdmin(AuthorizationHandlerContext context)
+        {
+            return (context.User.IsInRole("Admin")
+                 && context.User.HasClaim(c => c.Type == "Create" && c.Value == "True")
+                 && context.User.HasClaim(c => c.Type == "Edit" && c.Value == "True")
+                 && context.User.HasClaim(c => c.Type == "Delete" && c.Value == "True")
+                 || context.User.IsInRole("SuperAdmin"));
         }
     }
 }
