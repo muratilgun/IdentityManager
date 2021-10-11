@@ -99,5 +99,31 @@ namespace IdentityManager.Controllers
             return View(user);
 
         }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> LockUnlock(string userId)
+        {
+            var objFromDb = _db.ApplicationUser.FirstOrDefault(u => u.Id == userId);
+            if (objFromDb == null)
+            {
+                return NotFound();
+            }
+            if (objFromDb.LockoutEnd != null && objFromDb.LockoutEnd> DateTime.Now)
+            {
+                //Unlock user
+                objFromDb.LockoutEnd = DateTime.Now;
+                TempData[SD.Success] = "User unlocked successfully";
+            }
+            else
+            {
+                //Lock user
+                objFromDb.LockoutEnd = DateTime.Now.AddYears(1000);
+                TempData[SD.Success] = "User locked successfully";
+
+            }
+            _db.SaveChanges();
+            return RedirectToAction(nameof(Index));
+        }
     }
 }
